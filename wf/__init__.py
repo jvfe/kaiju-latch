@@ -5,57 +5,78 @@ Assemble and sort some COVID reads...
 import subprocess
 from pathlib import Path
 
-from latch import small_task, workflow
+from latch import medium_task, small_task, workflow
 from latch.types import LatchFile
 
+# Kaiju index path
+KAIJU_IDX = "/root/reference/"
 
-@small_task
-def assembly_task(read1: LatchFile, read2: LatchFile) -> LatchFile:
 
+@medium_task
+def taxonomy_classification_task(read1: LatchFile, read2: LatchFile) -> LatchFile:
+    global KAIJU_IDX
     # A reference to our output.
-    sam_file = Path("covid_assembly.sam").resolve()
+    output_name = "virus_kaiju.out"
+    kaiju_out = Path(output_name).resolve()
 
-    _bowtie2_cmd = [
-        "bowtie2/bowtie2",
-        "--local",
-        "-x",
-        "wuhan",
-        "-1",
+    _kaiju_cmd = [
+        "kaiju",
+        "-t",
+        f"{KAIJU_IDX}nodes.dmp",
+        "-f",
+        f"{KAIJU_IDX}kaiju_db_viruses.fmi",
+        "-i",
         read1.local_path,
-        "-2",
+        "-j",
         read2.local_path,
-        "--very-sensitive-local",
-        "-S",
-        str(sam_file),
+        "-z",
+        "2",
+        "-o",
+        str(kaiju_out),
     ]
 
-    subprocess.run(_bowtie2_cmd)
+    subprocess.run(_kaiju_cmd)
 
-    return LatchFile(str(sam_file), "latch:///covid_assembly.sam")
+    return LatchFile(str(kaiju_out), f"latch:///{output_name}")
 
 
 @small_task
-def sort_bam_task(sam: LatchFile) -> LatchFile:
+def kaiju2krona_task(kaiju_out: LatchFile) -> LatchFile:
+    global KAIJU_IDX
+    output_name = "virus_kaiju2krona.out"
+    krona_txt = Path(output_name).resolve()
 
-    bam_file = Path("covid_sorted.bam").resolve()
-
-    _samtools_sort_cmd = [
-        "samtools",
-        "sort",
+    _kaiju2krona_cmd = [
+        "kaiju2krona",
+        "-t",
+        f"{KAIJU_IDX}nodes.dmp",
+        "-n",
+        f"{KAIJU_IDX}names.dmp",
+        "-i",
+        kaiju_out.local_path,
         "-o",
-        str(bam_file),
-        "-O",
-        "bam",
-        sam.local_path,
+        str(krona_txt),
     ]
 
-    subprocess.run(_samtools_sort_cmd)
+    subprocess.run(_kaiju2krona_cmd)
 
-    return LatchFile(str(bam_file), "latch:///covid_sorted.bam")
+    return LatchFile(str(krona_txt), f"latch:///{output_name}")
+
+
+@small_task
+def plot_krona_task(krona_txt: LatchFile) -> LatchFile:
+    output_name = "virus_krona.html"
+    krona_html = Path(output_name).resolve()
+
+    _kaiju2krona_cmd = ["ktImportText", "-o", str(krona_txt), krona_txt.local_path]
+
+    subprocess.run(_kaiju2krona_cmd)
+
+    return LatchFile(str(krona_html), f"latch:///{output_name}")
 
 
 @workflow
-def assemble_and_sort(read1: LatchFile, read2: LatchFile) -> LatchFile:
+def classify_viruses(read1: LatchFile, read2: LatchFile) -> LatchFile:
     """Description...
 
     markdown header
@@ -95,5 +116,6 @@ def assemble_and_sort(read1: LatchFile, read2: LatchFile) -> LatchFile:
           __metadata__:
             display_name: Read2
     """
-    sam = assembly_task(read1=read1, read2=read2)
-    return sort_bam_task(sam=sam)
+    kaiju_out = taxonomy_classification_task(read1=read1, read2=read2)
+    kaiju2krona_out = kaiju2krona_task(kaiju_out=kaiju_out)
+    return plot_krona_task(krona_txt=kaiju2krona_out)
