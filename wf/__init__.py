@@ -1,5 +1,5 @@
 """
-Assemble and sort some COVID reads...
+Taxonomic classification of reads
 """
 
 import subprocess
@@ -10,21 +10,24 @@ from latch.types import LatchFile
 
 
 @small_task
-def taxonomy_classification_task(read1: LatchFile, read2: LatchFile) -> LatchFile:
-
-    # Kaiju index path
-    KAIJU_IDX = "/root/reference/"
+def taxonomy_classification_task(
+    read1: LatchFile,
+    read2: LatchFile,
+    kaiju_ref_nodes: LatchFile,
+    kaiju_ref_db: LatchFile,
+    sample: str,
+) -> LatchFile:
 
     # A reference to our output.
-    output_name = "virus_kaiju.out"
+    output_name = f"{sample}_kaiju.out"
     kaiju_out = Path(output_name).resolve()
 
     _kaiju_cmd = [
         "kaiju",
         "-t",
-        f"{KAIJU_IDX}nodes.dmp",
+        kaiju_ref_nodes.local_path,
         "-f",
-        f"{KAIJU_IDX}kaiju_db_viruses.fmi",
+        kaiju_ref_db.local_path,
         "-i",
         read1.local_path,
         "-j",
@@ -37,23 +40,27 @@ def taxonomy_classification_task(read1: LatchFile, read2: LatchFile) -> LatchFil
 
     subprocess.run(_kaiju_cmd)
 
-    return LatchFile(str(kaiju_out), f"latch:///{output_name}")
+    # return LatchFile(str(kaiju_out), f"latch:///{output_name}")
+    return LatchFile(str(kaiju_out))
 
 
 @small_task
-def kaiju2krona_task(kaiju_out: LatchFile) -> LatchFile:
-    # Kaiju index path
-    KAIJU_IDX = "/root/reference/"
+def kaiju2krona_task(
+    kaiju_out: LatchFile,
+    kaiju_ref_nodes: LatchFile,
+    kaiju_ref_names: LatchFile,
+    sample: str,
+) -> LatchFile:
 
-    output_name = "virus_kaiju2krona.out"
+    output_name = f"{sample}_kaiju2krona.out"
     krona_txt = Path(output_name).resolve()
 
     _kaiju2krona_cmd = [
         "kaiju2krona",
         "-t",
-        f"{KAIJU_IDX}nodes.dmp",
+        kaiju_ref_nodes.local_path,
         "-n",
-        f"{KAIJU_IDX}names.dmp",
+        kaiju_ref_names.local_path,
         "-i",
         kaiju_out.local_path,
         "-o",
@@ -62,23 +69,32 @@ def kaiju2krona_task(kaiju_out: LatchFile) -> LatchFile:
 
     subprocess.run(_kaiju2krona_cmd)
 
-    return LatchFile(str(krona_txt), f"latch:///{output_name}")
+    # return LatchFile(str(krona_txt), f"latch:///{output_name}")
+    return LatchFile(str(krona_txt))
 
 
 @small_task
-def plot_krona_task(krona_txt: LatchFile) -> LatchFile:
-    output_name = "virus_krona.html"
+def plot_krona_task(krona_txt: LatchFile, sample: str) -> LatchFile:
+    output_name = f"{sample}_krona.html"
     krona_html = Path(output_name).resolve()
 
     _kaiju2krona_cmd = ["ktImportText", "-o", str(krona_html), krona_txt.local_path]
 
     subprocess.run(_kaiju2krona_cmd)
 
-    return LatchFile(str(krona_html), f"latch:///{output_name}")
+    # return LatchFile(str(krona_html), f"latch:///{output_name}")
+    return LatchFile(str(krona_html))
 
 
 @workflow
-def classify_viruses(read1: LatchFile, read2: LatchFile) -> LatchFile:
+def classify_viruses(
+    read1: LatchFile,
+    read2: LatchFile,
+    kaiju_ref_nodes: LatchFile,
+    kaiju_ref_names: LatchFile,
+    kaiju_ref_db: LatchFile,
+    sample_name: str = "kaiju_sample",
+) -> LatchFile:
     """Description...
 
     markdown header
@@ -118,6 +134,27 @@ def classify_viruses(read1: LatchFile, read2: LatchFile) -> LatchFile:
           __metadata__:
             display_name: Read2
     """
-    kaiju_out = taxonomy_classification_task(read1=read1, read2=read2)
-    kaiju2krona_out = kaiju2krona_task(kaiju_out=kaiju_out)
-    return plot_krona_task(krona_txt=kaiju2krona_out)
+    kaiju_out = taxonomy_classification_task(
+        read1=read1,
+        read2=read2,
+        kaiju_ref_db=kaiju_ref_db,
+        kaiju_ref_nodes=kaiju_ref_nodes,
+        sample=sample_name,
+    )
+    kaiju2krona_out = kaiju2krona_task(
+        kaiju_out=kaiju_out,
+        sample=sample_name,
+        kaiju_ref_nodes=kaiju_ref_nodes,
+        kaiju_ref_names=kaiju_ref_names,
+    )
+    return plot_krona_task(krona_txt=kaiju2krona_out, sample=sample_name)
+
+
+# if __name__ == "__main__":
+#     classify_viruses(
+#         read1=LatchFile("/root/reference/viruses_R1.fastq"),
+#         read2=LatchFile("/root/reference/viruses_R2.fastq"),
+#         kaiju_ref_db=LatchFile("/root/reference/kaiju_db_viruses.fmi"),
+#         kaiju_ref_nodes=LatchFile("/root/reference/nodes.dmp"),
+#         kaiju_ref_names=LatchFile("/root/reference/names.dmp"),
+#     )
