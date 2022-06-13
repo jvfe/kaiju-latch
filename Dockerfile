@@ -17,9 +17,6 @@ RUN curl -L \
     cd KronaTools-2.8.1 &&\
     ./install.pl
 
-# Move Kaiju index to reference directory
-COPY data /root/reference
-
 # STOP HERE:
 # The following lines are needed to ensure your build environement works
 # correctly with latch.

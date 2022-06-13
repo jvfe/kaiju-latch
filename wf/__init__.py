@@ -18,7 +18,6 @@ def taxonomy_classification_task(
     sample: str,
 ) -> LatchFile:
 
-    # A reference to our output.
     output_name = f"{sample}_kaiju.out"
     kaiju_out = Path(output_name).resolve()
 
@@ -40,8 +39,7 @@ def taxonomy_classification_task(
 
     subprocess.run(_kaiju_cmd)
 
-    # return LatchFile(str(kaiju_out), f"latch:///{output_name}")
-    return LatchFile(str(kaiju_out))
+    return LatchFile(str(kaiju_out), f"latch:///kaiju/{output_name}")
 
 
 @small_task
@@ -69,8 +67,7 @@ def kaiju2krona_task(
 
     subprocess.run(_kaiju2krona_cmd)
 
-    # return LatchFile(str(krona_txt), f"latch:///{output_name}")
-    return LatchFile(str(krona_txt))
+    return LatchFile(str(krona_txt), f"latch:///kaiju/{output_name}")
 
 
 @small_task
@@ -82,57 +79,76 @@ def plot_krona_task(krona_txt: LatchFile, sample: str) -> LatchFile:
 
     subprocess.run(_kaiju2krona_cmd)
 
-    # return LatchFile(str(krona_html), f"latch:///{output_name}")
-    return LatchFile(str(krona_html))
+    return LatchFile(str(krona_html), f"latch:///kaiju/{output_name}")
 
 
 @workflow
-def classify_viruses(
+def kaiju_classification(
     read1: LatchFile,
     read2: LatchFile,
+    kaiju_ref_db: LatchFile,
     kaiju_ref_nodes: LatchFile,
     kaiju_ref_names: LatchFile,
-    kaiju_ref_db: LatchFile,
     sample_name: str = "kaiju_sample",
 ) -> LatchFile:
-    """Description...
+    """Fast taxonomic classification of high-throughput sequencing reads
 
-    markdown header
+    Kaiju
     ----
 
-    Write some documentation about your workflow in
-    markdown here:
-
-    > Regular markdown constructs work as expected.
-
-    # Heading
-
-    * content1
-    * content2
+    Kaiju performs taxonomic classification of
+    whole-genome sequencing metagenomics reads.
+    Reads are assigned to taxa by using a reference database
+    of protein sequences.
+    Read more about it [here](https://github.com/bioinformatics-centre/kaiju)
 
     __metadata__:
-        display_name: Assemble and Sort FastQ Files
+        display_name: Taxonomic classification with Kaiju
         author:
-            name:
+            name: João Vitor Ferreira Cavalcante
             email:
-            github:
-        repository:
+            github: https://github.com/jvfe/
+        repository: https://github.com/jvfe/kaiju-latch
         license:
-            id: MIT
+            id: GPL-3.0
 
     Args:
 
         read1:
-          Paired-end read 1 file to be assembled.
+          Paired-end read 1 file.
 
           __metadata__:
             display_name: Read1
 
         read2:
-          Paired-end read 2 file to be assembled.
+          Paired-end read 2 file.
 
           __metadata__:
             display_name: Read2
+
+        kaiju_ref_db:
+          Kaiju reference database '.fmi' file.
+
+          __metadata__:
+            display_name: Kaiju reference database (FM-index)
+
+        kaiju_ref_nodes:
+          Kaiju reference nodes, 'nodes.dmp' file.
+
+          __metadata__:
+            display_name: Kaiju reference database nodes
+
+        kaiju_ref_names:
+          Kaiju reference taxon names, 'names.dmp' file.
+
+          __metadata__:
+            display_name: Kaiju reference database names
+
+        sample_name:
+          Input sample name.
+
+          __metadata__:
+            display_name: Sample name
     """
     kaiju_out = taxonomy_classification_task(
         read1=read1,
@@ -148,13 +164,3 @@ def classify_viruses(
         kaiju_ref_names=kaiju_ref_names,
     )
     return plot_krona_task(krona_txt=kaiju2krona_out, sample=sample_name)
-
-
-# if __name__ == "__main__":
-#     classify_viruses(
-#         read1=LatchFile("/root/reference/viruses_R1.fastq"),
-#         read2=LatchFile("/root/reference/viruses_R2.fastq"),
-#         kaiju_ref_db=LatchFile("/root/reference/kaiju_db_viruses.fmi"),
-#         kaiju_ref_nodes=LatchFile("/root/reference/nodes.dmp"),
-#         kaiju_ref_names=LatchFile("/root/reference/names.dmp"),
-#     )
