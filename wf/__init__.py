@@ -17,6 +17,7 @@ def taxonomy_classification_task(
     kaiju_ref_db: LatchFile,
     sample: str,
 ) -> LatchFile:
+    """Classify metagenomic reads with Kaiju"""
 
     output_name = f"{sample}_kaiju.out"
     kaiju_out = Path(output_name).resolve()
@@ -49,6 +50,7 @@ def kaiju2krona_task(
     kaiju_ref_names: LatchFile,
     sample: str,
 ) -> LatchFile:
+    """Convert Kaiju output to Krona-readable format"""
 
     output_name = f"{sample}_kaiju2krona.out"
     krona_txt = Path(output_name).resolve()
@@ -72,6 +74,7 @@ def kaiju2krona_task(
 
 @small_task
 def plot_krona_task(krona_txt: LatchFile, sample: str) -> LatchFile:
+    """Make Krona plot from Kaiju results"""
     output_name = f"{sample}_krona.html"
     krona_html = Path(output_name).resolve()
 
@@ -96,11 +99,15 @@ def kaiju_classification(
     Kaiju
     ----
 
+    # Taxonomic classification with Kaiju
+
     Kaiju performs taxonomic classification of
     whole-genome sequencing metagenomics reads.
     Reads are assigned to taxa by using a reference database
     of protein sequences.
     Read more about it [here](https://github.com/bioinformatics-centre/kaiju)
+
+    Kaiju paper: https://doi.org/10.1038/ncomms11257
 
     __metadata__:
         display_name: Taxonomic classification with Kaiju
@@ -114,11 +121,19 @@ def kaiju_classification(
 
     Args:
 
+        sample_name:
+          Input sample name.
+
+          __metadata__:
+            display_name: Sample name
+
         read1:
           Paired-end read 1 file.
 
           __metadata__:
             display_name: Read1
+            _tmp:
+                section_title: Whole-metagenomes sequencing reads
 
         read2:
           Paired-end read 2 file.
@@ -131,6 +146,8 @@ def kaiju_classification(
 
           __metadata__:
             display_name: Kaiju reference database (FM-index)
+            _tmp:
+                section_title: Kaiju database files
 
         kaiju_ref_nodes:
           Kaiju reference nodes, 'nodes.dmp' file.
@@ -144,11 +161,6 @@ def kaiju_classification(
           __metadata__:
             display_name: Kaiju reference database names
 
-        sample_name:
-          Input sample name.
-
-          __metadata__:
-            display_name: Sample name
     """
     kaiju_out = taxonomy_classification_task(
         read1=read1,
