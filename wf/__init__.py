@@ -4,6 +4,7 @@ Taxonomic classification of reads
 
 import subprocess
 from pathlib import Path
+from typing import Tuple
 
 from latch import small_task, workflow
 from latch.types import LatchFile
@@ -73,6 +74,39 @@ def kaiju2krona_task(
 
 
 @small_task
+def kaiju2table_task(
+    kaiju_out: LatchFile,
+    kaiju_ref_nodes: LatchFile,
+    kaiju_ref_names: LatchFile,
+    sample: str,
+    taxon: str,
+) -> LatchFile:
+    """Convert Kaiju output to TSV format"""
+
+    output_name = f"{sample}_kaiju.tsv"
+    kaijutable_tsv = Path(output_name).resolve()
+
+    _kaiju2table_cmd = [
+        "kaiju2table",
+        "-t",
+        kaiju_ref_nodes.local_path,
+        "-n",
+        kaiju_ref_names.local_path,
+        "-r",
+        taxon,
+        "-p",
+        "-e",
+        "-o",
+        str(kaijutable_tsv),
+        kaiju_out.local_path,
+    ]
+
+    subprocess.run(_kaiju2table_cmd)
+
+    return LatchFile(str(kaijutable_tsv), f"latch:///kaiju/{output_name}")
+
+
+@small_task
 def plot_krona_task(krona_txt: LatchFile, sample: str) -> LatchFile:
     """Make Krona plot from Kaiju results"""
     output_name = f"{sample}_krona.html"
@@ -92,12 +126,13 @@ def kaiju_classification(
     kaiju_ref_db: LatchFile,
     kaiju_ref_nodes: LatchFile,
     kaiju_ref_names: LatchFile,
+    tax_rank: str = "species",
     sample_name: str = "kaiju_sample",
-) -> LatchFile:
+) -> Tuple[LatchFile, LatchFile]:
     """Fast taxonomic classification of high-throughput sequencing reads
 
     Kaiju
-    ----
+    -----
 
     # Taxonomic classification with Kaiju
 
@@ -161,6 +196,13 @@ def kaiju_classification(
           __metadata__:
             display_name: Kaiju reference database names
 
+        tax_rank:
+          Taxonomic rank for summary table output (kaiju2table).
+
+          __metadata__:
+            display_name: Taxonomic rank (kaiju2table)
+            _tmp:
+                section_title: Other parameters
     """
     kaiju_out = taxonomy_classification_task(
         read1=read1,
@@ -175,4 +217,12 @@ def kaiju_classification(
         kaiju_ref_nodes=kaiju_ref_nodes,
         kaiju_ref_names=kaiju_ref_names,
     )
-    return plot_krona_task(krona_txt=kaiju2krona_out, sample=sample_name)
+    krona_plot = plot_krona_task(krona_txt=kaiju2krona_out, sample=sample_name)
+    kaiju2table_out = kaiju2table_task(
+        kaiju_out=kaiju_out,
+        sample=sample_name,
+        kaiju_ref_nodes=kaiju_ref_nodes,
+        kaiju_ref_names=kaiju_ref_names,
+        taxon=tax_rank,
+    )
+    return kaiju2table_out, krona_plot
