@@ -152,7 +152,7 @@ def kaiju_classification(
             github: https://github.com/jvfe/
         repository: https://github.com/jvfe/kaiju-latch
         license:
-            id: GPL-3.0
+            id: MIT
 
     Args:
 
